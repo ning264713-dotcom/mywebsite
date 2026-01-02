@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>系統管理授權</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        :root { --admin-bg: #0f172a; --panel-bg: #1e293b; --accent: #38bdf8; --text-main: #334155; }
+        body { font-family: 'PingFang TC', sans-serif; background: var(--admin-bg); margin: 0; color: #f1f5f9; }
+        
+        /* 驗證牆 */
+        #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--admin-bg); display: flex; justify-content: center; align-items: center; z-index: 10000; }
+        .auth-card { background: var(--panel-bg); padding: 40px; border-radius: 20px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); width: 350px; text-align: center; }
+        .auth-input { width: 100%; padding: 15px; margin: 20px 0; border-radius: 10px; border: 2px solid #334155; background: #0f172a; color: #fff; font-size: 18px; text-align: center; box-sizing: border-box; }
+        
+        /* 主介面 */
+        #admin-panel { display: none; }
+        .sidebar { width: 240px; background: #1e293b; height: 100vh; position: fixed; border-right: 1px solid rgba(255,255,255,0.05); }
+        .nav-btn { padding: 15px 30px; cursor: pointer; transition: 0.3s; display: block; color: #94a3b8; text-decoration: none; }
+        .nav-btn:hover, .nav-btn.active { background: rgba(56, 189, 248, 0.1); color: var(--accent); }
+        
+        .main-content { margin-left: 240px; padding: 40px; color: var(--text-main); background: #f8fafc; min-height: 100vh; }
+        .form-card { background: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 30px; display: none; }
+        .active-sec { display: block !important; }
+        
+        h2 { margin-top: 0; color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
+        label { display: block; margin-top: 15px; font-weight: bold; font-size: 14px; }
+        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        .btn-action { background: var(--accent); color: #0f172a; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <i class="fa-solid fa-lock" style="font-size: 40px; color: var(--accent);"></i>
+            <h2>管理授權</h2>
+            <input type="password" id="pwInput" class="auth-input" placeholder="請輸入密碼">
+            <button class="btn-action" onclick="verify()">登入系統</button>
+            <p id="msg" style="color: #f43f5e; margin-top: 10px; font-size: 14px;"></p>
+        </div>
+    </div>
+
+    <div id="admin-panel">
+        <nav class="sidebar">
+            <div style="padding: 30px; font-weight: bold; color: var(--accent); font-size: 20px;">控制台</div>
+            <div class="nav-btn active" id="btn-config" onclick="showSec('config')"><i class="fa-solid fa-sliders"></i> 網站設定</div>
+            <div class="nav-btn" id="btn-post" onclick="showSec('post')"><i class="fa-solid fa-plus"></i> 新增文章</div>
+            <div style="position: absolute; bottom: 30px; width: 100%;">
+                <a href="index.html" class="nav-btn"><i class="fa-solid fa-house"></i> 回到前台</a>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div id="sec-config" class="form-card active-sec">
+                <h2>🌐 網站基礎配置</h2>
+                <label>網站名稱</label><input type="text" id="cfgName">
+                <label>Logo 網址</label><input type="text" id="cfgLogo">
+                <label>關於我們描述</label><textarea id="cfgFootDesc" rows="4"></textarea>
+                <button class="btn-action" onclick="saveConfig()">儲存所有設定</button>
+            </div>
+
+            <div id="sec-post" class="form-card">
+                <h2>✍️ 發布新文章</h2>
+                <label>文章標題</label><input type="text" id="postT" placeholder="請輸入標題">
+                <label>分類標籤</label>
+                <select id="postTag">
+                    <option>3C 新聞</option><option>科技快報</option><option>生活資訊</option>
+                </select>
+                <label>縮圖網址 (URL)</label><input type="text" id="postI" placeholder="https://...">
+                <label>詳細內容</label><textarea id="postC" rows="10" placeholder="在此輸入文章內容..."></textarea>
+                <button class="btn-action" style="background: #10b981; color: white;" onclick="addPost()">發布文章</button>
+            </div>
+        </main>
+    </div>
+
+<script>
+    const KEY = "Kame84218848"; // 你的密碼
+    const DB = { NAME:'sn', LOGO:'sl', F_DESC:'fd', POSTS:'ps' };
+
+    function verify() {
+        if(document.getElementById('pwInput').value === KEY) {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('admin-panel').style.display = 'block';
+            loadCurrentData();
+        } else {
+            document.getElementById('msg').innerText = "密碼錯誤！";
+        }
+    }
+
+    function showSec(sec) {
+        document.querySelectorAll('.form-card').forEach(c => c.classList.remove('active-sec'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('sec-' + sec).classList.add('active-sec');
+        document.getElementById('btn-' + sec).classList.add('active');
+    }
+
+    function loadCurrentData() {
+        document.getElementById('cfgName').value = localStorage.getItem(DB.NAME) || '';
+        document.getElementById('cfgLogo').value = localStorage.getItem(DB.LOGO) || '';
+        document.getElementById('cfgFootDesc').value = localStorage.getItem(DB.F_DESC) || '';
+    }
+
+    function saveConfig() {
+        localStorage.setItem(DB.NAME, document.getElementById('cfgName').value);
+        localStorage.setItem(DB.LOGO, document.getElementById('cfgLogo').value);
+        localStorage.setItem(DB.F_DESC, document.getElementById('cfgFootDesc').value);
+        alert('✅ 網站配置已儲存！');
+    }
+
+    // 核心功能：發布文章
+    function addPost() {
+        const t = document.getElementById('postT').value;
+        const tag = document.getElementById('postTag').value;
+        const c = document.getElementById('postC').value;
+        const img = document.getElementById('postI').value || 'https://picsum.photos/600/400';
+
+        if(!t || !c) {
+            alert('❌ 標題與內容為必填！');
+            return;
+        }
+
+        // 讀取舊文章
+        let posts = JSON.parse(localStorage.getItem(DB.POSTS) || '[]');
+        
+        // 加入新文章到最前面
+        posts.unshift({ t, tag, c, img, date: new Date().getTime() });
+        
+        // 寫回 LocalStorage
+        localStorage.setItem(DB.POSTS, JSON.stringify(posts));
+        
+        alert('🎉 文章發布成功！');
+        
+        // 清空輸入框
+        document.getElementById('postT').value = '';
+        document.getElementById('postC').value = '';
+        document.getElementById('postI').value = '';
+        
+        // 自動切換到設定頁面（或是你可以保持在原位）
+        showSec('config');
+    }
+</script>
+</body>
+</html>

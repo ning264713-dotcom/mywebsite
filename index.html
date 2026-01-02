@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="tabTitle">我的媒體站</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        :root { --primary: #4361ee; --accent: #f72585; --bg: #f5f7fa; }
+        body { font-family: 'PingFang TC', sans-serif; margin: 0; background: var(--bg); scroll-behavior: smooth; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+        
+        /* 導覽列 */
+        .navbar { background: #fff; height: 70px; display: flex; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); position: sticky; top:0; z-index: 1000; }
+        .nav-content { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .logo { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 20px; cursor: pointer; }
+        
+        .search-area { display: flex; align-items: center; gap: 15px; }
+        .search-input { padding: 8px 15px; border: 1px solid #ddd; border-radius: 20px; outline: none; font-size: 14px; transition: 0.3s; }
+        .search-input:focus { border-color: var(--primary); width: 200px; }
+        .nav-link { font-size: 14px; color: #666; cursor: pointer; text-decoration: none; }
+        .nav-link:hover { color: var(--primary); }
+
+        .marquee { background: #1e1e2d; color: #fff; padding: 10px 0; font-size: 14px; overflow: hidden; }
+
+        .post-list { margin: 40px 0; display: grid; gap: 25px; }
+        .post-card { background: #fff; display: flex; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); height: 200px; transition: 0.3s; cursor: pointer; }
+        .post-card:hover { transform: translateY(-5px); }
+        .post-img { width: 300px; object-fit: cover; }
+        .post-info { padding: 25px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        
+        #read-view { display: none; background: #fff; min-height: 100vh; position: fixed; top: 0; left: 0; width: 100%; z-index: 2000; overflow-y: auto; padding-top: 50px; }
+
+        footer { background: #1e1e2d; color: #fff; padding: 60px 0; margin-top: 50px; }
+    </style>
+</head>
+<body>
+
+    <div id="main-view">
+        <nav class="navbar">
+            <div class="container nav-content">
+                <div class="logo" onclick="location.reload()">
+                    <img id="logoImg" src="" width="30"> <span id="siteName"></span>
+                </div>
+                <div class="search-area">
+                    <input type="text" id="searchInput" class="search-input" placeholder="搜尋文章標題..." oninput="renderPosts()">
+                    <a href="#footer" class="nav-link">關於我</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="marquee">
+            <div class="container">🕒 <span id="liveTime"></span> | <span id="promoText"></span></div>
+        </div>
+
+        <div class="container">
+            <div id="post-items" class="post-list"></div>
+        </div>
+    </div>
+
+    <div id="read-view">
+        <div class="container">
+            <button onclick="closeFull()" style="padding: 10px 20px; cursor: pointer; border-radius: 5px; border: 1px solid #ddd;">← 返回列表</button>
+            <div id="full-content" style="margin-top: 30px;"></div>
+        </div>
+    </div>
+
+    <footer id="footer">
+        <div class="container">
+            <h3 style="color: var(--primary);">關於我們</h3>
+            <p id="footDesc" style="line-height: 1.8; color: #a2a3b7; max-width: 600px;"></p>
+            <p id="footTel" style="margin-top: 20px;"></p>
+            <hr style="opacity: 0.1; margin: 30px 0;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666;">
+                <span>© 2026 <span id="footBrand"></span></span>
+                <a href="admin.html" style="color: inherit; text-decoration: none;">管理員入口</a>
+            </div>
+        </div>
+    </footer>
+
+<script>
+    const DB = { NAME:'sn', LOGO:'sl', PROMO:'sp', F_DESC:'fd', F_TEL:'ft', POSTS:'ps' };
+
+    window.onload = () => {
+        initBaseInfo();
+        renderPosts();
+        setInterval(() => { document.getElementById('liveTime').innerText = new Date().toLocaleString(); }, 1000);
+    };
+
+    function initBaseInfo() {
+        const name = localStorage.getItem(DB.NAME) || '我的媒體站';
+        document.getElementById('siteName').innerText = name;
+        document.getElementById('footBrand').innerText = name;
+        document.getElementById('tabTitle').innerText = name;
+        document.getElementById('logoImg').src = localStorage.getItem(DB.LOGO) || 'https://via.placeholder.com/30';
+        document.getElementById('promoText').innerText = localStorage.getItem(DB.PROMO) || '歡迎光臨';
+        document.getElementById('footDesc').innerText = localStorage.getItem(DB.F_DESC) || '尚未設定關於我的描述內容。';
+        document.getElementById('footTel').innerText = '📞 聯絡電話：' + (localStorage.getItem(DB.F_TEL) || '未設定');
+    }
+
+    // 搜尋功能核心：過濾並重新渲染
+    function renderPosts() {
+        const keyword = document.getElementById('searchInput').value.toLowerCase();
+        const allPosts = JSON.parse(localStorage.getItem(DB.POSTS) || '[]');
+        
+        const filteredPosts = allPosts.filter(p => 
+            p.t.toLowerCase().includes(keyword) || 
+            p.c.toLowerCase().includes(keyword) ||
+            p.tag.toLowerCase().includes(keyword)
+        );
+
+        const container = document.getElementById('post-items');
+        
+        if (filteredPosts.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:100px; color:#aaa;">🔍 找不到與「${keyword}」相關的文章</div>`;
+            return;
+        }
+
+        container.innerHTML = filteredPosts.map((p, i) => `
+            <div class="post-card" onclick="openFull(${i})">
+                <img src="${p.img}" class="post-img">
+                <div class="post-info">
+                    <div>
+                        <span style="background:var(--primary); color:#fff; padding:3px 8px; border-radius:4px; font-size:11px;">${p.tag}</span>
+                        <h2 style="margin:10px 0; font-size: 20px;">${p.t}</h2>
+                        <p style="color:#666; font-size:14px; line-height: 1.6;">${p.c.substring(0,85)}...</p>
+                    </div>
+                    <div style="text-align:right; color:var(--primary);"><i class="fa-solid fa-arrow-right"></i></div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function openFull(i) {
+        // 注意：搜尋後索引會變，所以要重新抓過濾後的資料或比對標題
+        const keyword = document.getElementById('searchInput').value.toLowerCase();
+        const allPosts = JSON.parse(localStorage.getItem(DB.POSTS) || '[]');
+        const filteredPosts = allPosts.filter(p => 
+            p.t.toLowerCase().includes(keyword) || p.c.toLowerCase().includes(keyword)
+        );
+        const p = filteredPosts[i];
+
+        document.getElementById('read-view').style.display = 'block';
+        document.getElementById('full-content').innerHTML = `
+            <h1 style="font-size:32px;">${p.t}</h1>
+            <p style="color:var(--primary); font-weight:bold;"># ${p.tag}</p>
+            <img src="${p.img}" style="width:100%; border-radius:15px; margin:20px 0; box-shadow: 0 5px 20px rgba(0,0,0,0.1);">
+            <div style="font-size:18px; line-height:2; white-space:pre-wrap; color: #333;">${p.c}</div>
+        `;
+        window.scrollTo(0,0);
+    }
+
+    function closeFull() { document.getElementById('read-view').style.display = 'none'; }
+</script>
+</body>
+</html>
